@@ -1,4 +1,4 @@
-from time import time
+#from time import time
 
 class PIDController:
     def __init__(self):
@@ -14,8 +14,8 @@ class PIDController:
         else:
             return max(value, self.min_out_limit)
 
-    def calc_pid(self, current_value, limit_value):
-        now = float(time())
+    def calc_pid(self, current_value, limit_value, now):
+        #now = float(time())
         change_in_time = float(now - self.last_time)
 
         if change_in_time >= self.time_sample:
@@ -47,6 +47,6 @@ class PIDController:
             return self.ki
         if kd is None:
             return self.kd
-        self.kp = kp if kp > 0 else __class__.kp
-        self.ki = ki if ki > 0 else __class__.ki
-        self.kd = kd if kd > 0 else __class__.kd
+        if kp >= 0: self.kp = kp 
+        if ki >= 0: self.ki = ki
+        if kd >= 0: self.kd = kd

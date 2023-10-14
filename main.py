@@ -8,7 +8,7 @@ from PID import PIDController
 
 class LandingBurn:
     def __init__(self):
-        self.conn = krpc.connect("Starship")
+        self.conn = krpc.connect("Starship", address="192.168.50.114")
         self.drawing = self.conn.drawing
         self.space_center = self.conn.space_center
         self.vessel = self.space_center.active_vessel
@@ -30,7 +30,7 @@ class LandingBurn:
 
         # PID
         self.wings_controller = PIDController()
-        self.wings_controller.adjust_pid(0.1, 0.01, 0.1)
+        self.wings_controller.adjust_pid(.01, .2, .02) # 0.025, 0.001, 0.1
         self.wings_controller.limit_output(0, 1)
 
         # Streams
@@ -40,6 +40,7 @@ class LandingBurn:
         self.stream_surface_altitude = self.conn.add_stream(getattr, self.flight_body, "surface_altitude")
         self.stream_pitch = self.conn.add_stream(getattr, self.flight_surface, "pitch")
         self.stream_situation = self.conn.add_stream(getattr, self.vessel, "situation")
+        self.stream_ut = self.conn.add_stream(getattr, self.space_center, "ut")
 
         # ===================
 
@@ -51,8 +52,8 @@ class LandingBurn:
         # Params
         self.max_twr = 4
         self.eng_threshold = .8
-        self.final_speed = -1
-        self.final_altitude = 10
+        self.final_speed = -2
+        self.final_altitude = 20
         self.gear_delay = 4
         self.flip_delay = .5
 
@@ -94,7 +95,7 @@ class LandingBurn:
             self.auto_pilot.target_direction = (1, 0, 0)
             self.auto_pilot.target_roll = 0
             
-            target_altitude = 5000
+            target_altitude = 3000
             v_max = 50
 
             self.control.throttle = 1
@@ -163,12 +164,12 @@ class LandingBurn:
                     self.wing_ur.target_angle = 180
                     self.wing_dl.target_angle = 90
                     self.wing_dr.target_angle = 90
-                    self.accelerating = True
                     self.auto_pilot.reference_frame = self.body_ref
                     self.auto_pilot.target_roll = -90
+                    self.accelerating = True
                 else:
                     pitch = self.stream_pitch()
-                    ctrl = self.wings_controller.calc_pid(pitch, 0)
+                    ctrl = self.wings_controller.calc_pid(pitch, 0, self.stream_ut())
 
                     up = 90 * (ctrl + 1)
                     down = 270 - up
@@ -178,7 +179,7 @@ class LandingBurn:
                     self.wing_dl.target_angle = down
                     self.wing_dr.target_angle = down
 
-                    #print(f'Pitch: {pitch:.2f} | PID: {ctrl:.2f} | TToBurn: {t_to_burn:.2f}')
+                    print(f'Pitch: {pitch:.2f} | PID: {ctrl:.2f} | TToBurn: {t_to_burn:.2f}')
 
             else: # THROTTLING
                 target_dir = -vel
@@ -204,7 +205,7 @@ class LandingBurn:
 
                 self.control.throttle = throttle
     
-                # fts
+                # FTS
                 if delta_speed > 20 and len(fts_modules) != 0:
                     self.vessel.control.throttle = 0
                     for m in fts_modules: m.trigger_event("Self Destruct!")
