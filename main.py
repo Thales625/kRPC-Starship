@@ -8,7 +8,7 @@ from PID import PIDController
 
 class LandingBurn:
     def __init__(self):
-        self.conn = krpc.connect("Starship", address="192.168.50.114")
+        self.conn = krpc.connect("Starship")
         self.drawing = self.conn.drawing
         self.space_center = self.conn.space_center
         self.vessel = self.space_center.active_vessel
@@ -30,7 +30,7 @@ class LandingBurn:
 
         # PID
         self.wings_controller = PIDController()
-        self.wings_controller.adjust_pid(.01, .2, .02) # 0.025, 0.001, 0.1
+        self.wings_controller.adjust_pid(.1, .09, .1) # 0.025, 0.001, 0.1
         self.wings_controller.limit_output(0, 1)
 
         # Streams
@@ -111,7 +111,7 @@ class LandingBurn:
                 v_x = self.stream_vel()[0]
 
                 dy = target_altitude - alt
-                if dy<0: break
+                if dy < 0: break
 
                 a_eng = av_thrust / mass
                 a_net = a_eng - self.a_g
@@ -218,7 +218,7 @@ class LandingBurn:
                 # Aim Vessel
                 self.auto_pilot.target_direction = self.space_center.transform_direction(target_dir, self.surface_ref, self.body_ref)
 
-            sleep(0.05)
+            sleep(0.01)
 
     def progressive_engine_cut(self):
         a_eng = self.stream_av_thrust() / self.stream_mass()
