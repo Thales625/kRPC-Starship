@@ -1,8 +1,8 @@
 import krpc
 from time import sleep
-from math import sqrt
+from math import sqrt, pi, atan2
 
-from Vector import Vector3
+from PyVecs import Vector3
 
 from PID import PIDController
 
@@ -30,8 +30,8 @@ class LandingBurn:
 
         # PID
         self.wings_controller = PIDController()
-        self.wings_controller.adjust_pid(.1, .09, .1) # 0.025, 0.001, 0.1
-        self.wings_controller.limit_output(0, 1)
+        self.wings_controller.adjust_pid(0.05, 0.1, 0.25)
+        self.wings_controller.limit_output(-1, 1)
 
         # Streams
         self.stream_mass = self.conn.add_stream(getattr, self.vessel, "mass")
@@ -53,9 +53,9 @@ class LandingBurn:
         self.max_twr = 4
         self.eng_threshold = .8
         self.final_speed = -2
-        self.final_altitude = 20
+        self.final_altitude = 5
         self.gear_delay = 4
-        self.flip_delay = .5
+        self.flip_delay = .8
 
         # Consts
         self.a_g = self.body.surface_gravity
@@ -86,7 +86,7 @@ class LandingBurn:
 
         # Auto Pilot
         self.auto_pilot.reference_frame = self.surface_ref
-        self.auto_pilot.stopping_time = (.5, .5, .5)
+        self.auto_pilot.stopping_time = (1, 1, 1) #(.5, .5, .5)
         self.auto_pilot.deceleration_time = (5, 5, 5)
         self.auto_pilot.engage()
         
@@ -166,12 +166,14 @@ class LandingBurn:
                     self.wing_dr.target_angle = 90
                     self.auto_pilot.reference_frame = self.body_ref
                     self.auto_pilot.target_roll = -90
+                    self.auto_pilot.stopping_time = (.5, .5, .5)
                     self.accelerating = True
                 else:
                     pitch = self.stream_pitch()
-                    ctrl = self.wings_controller.calc_pid(pitch, 0, self.stream_ut())
+                    pid = self.wings_controller.calc_pid(pitch, 0, self.stream_ut())
+                    ctrl = atan2(pid, 1) * (180/pi)
 
-                    up = 90 * (ctrl + 1)
+                    up = 135 + ctrl
                     down = 270 - up
                    
                     self.wing_ul.target_angle = up
@@ -179,7 +181,7 @@ class LandingBurn:
                     self.wing_dl.target_angle = down
                     self.wing_dr.target_angle = down
 
-                    print(f'Pitch: {pitch:.2f} | PID: {ctrl:.2f} | TToBurn: {t_to_burn:.2f}')
+                    print(f'Pitch: {pitch:.2f} | Ctrl: {ctrl:.2f}  | PID: {pid:.2f} | TToBurn: {t_to_burn:.2f}')
 
             else: # THROTTLING
                 target_dir = -vel
