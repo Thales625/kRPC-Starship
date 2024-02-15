@@ -1,10 +1,17 @@
 import krpc
 from time import sleep
-from math import sqrt, pi, atan2
+from math import sqrt, atan2
 
 from PyVecs import Vector3
 
 from PID import PIDController
+
+RAD2DEG = 180/3.14159265
+
+def get_area_by_bbox(bbox):
+    a, b = bbox
+    delta = b - a
+    return abs(delta.x * delta.y * delta.z) # ignore y or z axis
 
 class LandingBurn:
     def __init__(self):
@@ -27,6 +34,12 @@ class LandingBurn:
 
         # GET WINGS
         self.wing_ur, self.wing_ul, self.wing_dr, self.wing_dl = self.get_wings()
+
+        self.wing_u_pos = sum([w.part.position(self.vessel_ref[0]) for w in [self.wing_ur, self.wing_ul]]) * 0.5
+        self.wing_d_pos = sum([w.part.position(self.vessel_ref[0]) for w in [self.wing_dr, self.wing_dl]]) * 0.5
+
+        self.wing_u_area = sum([get_area_by_bbox(child.bounding_box(self.vessel_ref)) for child in [w.part for w in [self.wing_ur, self.wing_ul]]])
+        self.wing_d_area = sum([get_area_by_bbox(child.bounding_box(self.vessel_ref)) for child in [w.part for w in [self.wing_dr, self.wing_dl]]])
 
         # PID
         self.wings_controller = PIDController()
@@ -86,7 +99,7 @@ class LandingBurn:
 
         # Auto Pilot
         self.auto_pilot.reference_frame = self.surface_ref
-        self.auto_pilot.stopping_time = (1, 1, 1) #(.5, .5, .5)
+        self.auto_pilot.stopping_time = (1, 1, 1)
         self.auto_pilot.deceleration_time = (5, 5, 5)
         self.auto_pilot.engage()
         
@@ -150,14 +163,6 @@ class LandingBurn:
             t_burning = sqrt((2*burn_altitude) / a_net)
             t_fall = t_to_burn + t_burning
 
-            '''
-            burn_altitude = (mag_speed**2 - self.final_speed**2 + 2*self.a_g*alt) / (2 * a_eng_l)
-            t_free_fall = (vel.x + sqrt(vel.x**2 + 2*self.a_g*alt)) / self.a_g
-            t_to_burn = (vel.x + sqrt(max(0, vel.x**2 + 2*self.a_g*(alt - burn_altitude)))) / self.a_g
-            t_burning = sqrt(2*abs(burn_altitude) / a_net)
-            t_fall = t_to_burn + t_burning
-            '''
-
             if not self.accelerating:
                 if t_to_burn <= self.flip_delay: # EXEC BELLY FLOP
                     self.wing_ul.target_angle = 180
@@ -171,7 +176,7 @@ class LandingBurn:
                 else:
                     pitch = self.stream_pitch()
                     pid = self.wings_controller.calc_pid(pitch, 0, self.stream_ut())
-                    ctrl = atan2(pid, 1) * (180/pi)
+                    ctrl = atan2(pid, 1) * RAD2DEG
 
                     up = 135 + ctrl
                     down = 270 - up
